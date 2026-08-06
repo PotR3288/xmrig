@@ -78,7 +78,6 @@ private:
 #   endif
 
     bool nextRound();
-
     bool verify(const Algorithm &algorithm, const uint8_t *referenceValue);
     bool verify2(const Algorithm &algorithm, const uint8_t *referenceValue);
     void allocateCnCtx();

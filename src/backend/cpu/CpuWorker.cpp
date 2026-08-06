@@ -566,3 +566,4 @@ template class CpuWorker<5>;
 template class CpuWorker<8>;
 
 } // namespace xmrig
+

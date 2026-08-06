@@ -31,21 +31,32 @@
 #include <map>
 #include <vector>
 
+// Base58 alphabet for Tari address decoding
+static constexpr const char *base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+// Reverse lookup table for Base58 (initialized once, thread-safe under C++11+).
+static const int8_t *base58_reverse()
+{
+    static const int8_t *rev = [] {
+        auto *table = new int8_t[256];
+        memset(table, -1, sizeof(int8_t) * 256);
+        for (size_t i = 0; base58_alphabet[i]; ++i) {
+            table[static_cast<uint8_t>(base58_alphabet[i])] = static_cast<int8_t>(i);
+        }
+        return table;
+    }();
+    return rev;
+}
+
 // Base58 decoder for Tari addresses
 // Simple multiply-accumulate: result = result * 58 + digit, using uint64_t chunks.
 static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &output)
 {
-    static constexpr const char *base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
     output.clear();
     if (len == 0) return true;
 
-    // Build reverse lookup table
-    int8_t rev[256];
-    memset(rev, -1, sizeof(rev));
-    for (size_t i = 0; base58_alphabet[i]; ++i) {
-        rev[static_cast<uint8_t>(base58_alphabet[i])] = static_cast<int8_t>(i);
-    }
+    const int8_t *rev = base58_reverse();
 
     // Count leading zeros (characters that map to value 0, i.e., '1')
     size_t zero_count = 0;
@@ -117,28 +128,16 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
 
     // Tari addresses start with specific 2-character prefixes:
     // First char encodes network byte: '1'=0x00 (MainNet), 'f'=0x26 (Esmeralda)
-    // Second char encodes feature byte: '2'=0x01, etc.
-    static constexpr char base58_alphabet[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    
-    bool is_tari_address = false;
-    uint8_t net_byte = 0, feat_byte = 0;
-
+    // Second char encodes feature byte, looked up via the shared Base58 reverse table.
+    uint8_t net_byte = 0;
     if (size >= 2 && address[0] == 'f') {
         net_byte = 0x26; // Esmeralda
-        for (int i = 0; i < 58; ++i) {
-            if (base58_alphabet[i] == address[1]) { feat_byte = static_cast<uint8_t>(i); break; }
-        }
-        is_tari_address = true;
-    }
-    else if (size >= 2 && address[0] == '1') {
+    } else if (size >= 2 && address[0] == '1') {
         net_byte = 0x00; // MainNet
-        for (int i = 0; i < 58; ++i) {
-            if (base58_alphabet[i] == address[1]) { feat_byte = static_cast<uint8_t>(i); break; }
-        }
-        is_tari_address = true;
     }
 
-    if (is_tari_address && size >= 2) {
+    if (net_byte != 0 || address[0] == '1') {
+        uint8_t feat_byte = static_cast<uint8_t>(base58_reverse()[static_cast<uint8_t>(address[1])]);
         m_tag = static_cast<uint64_t>(net_byte << 8 | feat_byte);
         address += 2;
         size -= 2;
@@ -152,8 +151,8 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
             return false;
         }
 
-        // Tari addresses: network(1) + features(1) + spend_key(32) + view_key(32) + checksum(1) = 67 bytes
-        const size_t expected_data_size = 67;  // network + features + spend + view + checksum
+        // Tari addresses: network(1) + features(1) + view_key(32) + spend_key(32) + checksum(1) = 67 bytes
+        const size_t expected_data_size = 67;  // network + features + view + spend + checksum
 
         if (rest_data.size() != expected_data_size - 2) {
             return false;
@@ -168,12 +167,7 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
             data.emplace_back(b);
         }
 
-        // Validate checksum using DammSum algorithm
         const size_t data_size = data.size();
-        if (data_size != expected_data_size) {
-            return false;
-        }
-
         uint8_t checksum = data.back();
         const uint8_t *spend_key = data.data() + 34;   // offset 34: after network(1), features(1), and view_key(32)
         const uint8_t *view_key = data.data() + 2;     // offset 2: after network and features

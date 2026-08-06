@@ -64,6 +64,10 @@ public:
     inline size_t offset(Offset offset) const               { return m_offsets[offset]; }
     inline size_t size() const                              { return m_blob.size(); }
 
+    // Tari-specific constants
+    static constexpr size_t TARI_NONCE_OFFSET = 35;        // Tari uses 8-byte nonces at offset 35
+    static constexpr size_t TARI_MINER_TX_PREFIX_OFFSET = 43;  // After nonce (35 + 8)
+
     // Block header
     inline uint8_t majorVersion() const                     { return m_version.first; }
     inline uint8_t minorVersion() const                     { return m_version.second; }
@@ -76,8 +80,6 @@ public:
         }
         return blob(NONCE_OFFSET);
     }
-
-    void setNonceTemp(const uint8_t *nonce);
 
     // Wownero miner signature
     inline bool hasMinerSignature() const                   { return !m_minerSignature.empty(); }

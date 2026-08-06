@@ -180,11 +180,6 @@ bool xmrig::BlockTemplate::parse(const char *blocktemplate, size_t size, const C
     return rc;
 }
 
-void xmrig::BlockTemplate::setNonceTemp(const uint8_t *nonce)
-{
-    memcpy(m_nonceTemp, nonce, 8);
-}
-
 bool xmrig::BlockTemplate::parse(const rapidjson::Value &blocktemplate, const Coin &coin, bool hashes)
 {
     return blocktemplate.IsString() && parse(blocktemplate.GetString(), blocktemplate.GetStringLength(), coin, hashes);
@@ -224,13 +219,13 @@ bool xmrig::BlockTemplate::parse(bool hashes)
     ar(m_timestamp);
     ar(m_prevId, kHashSize);
 
-    // Tari uses 8-byte nonces at offset 35
+    // Tari: 8-byte nonce at offset 35, no standard miner-tx parsing needed
     if (m_coin.id() == Coin::TARI) {
-        setOffset(NONCE_OFFSET, 35);
-        memcpy(m_nonceTemp, m_blob.data() + 35, 8);
-
-        // For Tari, MINER_TX_PREFIX_OFFSET is 43 (after nonce)
-        // We'll handle the rest in the early return below
+        setOffset(NONCE_OFFSET, TARI_NONCE_OFFSET);
+        memcpy(m_nonceTemp, m_blob.data() + TARI_NONCE_OFFSET, 8);
+        setOffset(MINER_TX_PREFIX_OFFSET, TARI_MINER_TX_PREFIX_OFFSET);
+        setOffset(MINER_TX_PREFIX_END_OFFSET, m_blob.size());
+        return true;
     }
 
     // Wownero block template has miner signature starting from version 18
@@ -242,17 +237,6 @@ bool xmrig::BlockTemplate::parse(bool hashes)
     if (m_coin == Coin::ZEPHYR) {
         uint8_t pricing_record[120];
         ar(pricing_record);
-    }
-
-    // For Tari, skip standard parsing and set offsets for mining blob format
-    if (m_coin.id() == Coin::TARI) {
-        // Set MINER_TX_PREFIX_OFFSET to 43 (after nonce)
-        setOffset(MINER_TX_PREFIX_OFFSET, 43);
-
-        // Set MINER_TX_PREFIX_END_OFFSET - Tari uses the entire blob after offset 43
-        setOffset(MINER_TX_PREFIX_END_OFFSET, m_blob.size());
-
-        return true;
     }
     
     // Miner transaction begin
