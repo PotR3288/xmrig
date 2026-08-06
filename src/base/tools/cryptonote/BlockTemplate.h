@@ -69,7 +69,15 @@ public:
     inline uint8_t minorVersion() const                     { return m_version.second; }
     inline uint64_t timestamp() const                       { return m_timestamp; }
     inline const Span &prevId() const                       { return m_prevId; }
-    inline const uint8_t *nonce() const                     { return blob(NONCE_OFFSET); }
+    inline const uint8_t *nonce() const {
+        // For Tari, use the stored nonce from offset 35
+        if (m_coin.id() == Coin::TARI) {
+            return m_nonceTemp;
+        }
+        return blob(NONCE_OFFSET);
+    }
+
+    void setNonceTemp(const uint8_t *nonce);
 
     // Wownero miner signature
     inline bool hasMinerSignature() const                   { return !m_minerSignature.empty(); }
@@ -153,6 +161,9 @@ private:
     uint8_t m_carrotViewTag[3]{};
     uint8_t m_janusAnchor[16]{};
     uint8_t m_FCMPTreeLayers = 0;
+
+    // Tari-specific: nonce storage (8 bytes at offset 35)
+    alignas(8) uint8_t m_nonceTemp[8]{};
     uint8_t m_FCMPTreeRoot[kHashSize]{};
 };
 

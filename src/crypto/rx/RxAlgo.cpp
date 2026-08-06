@@ -50,6 +50,10 @@ const RandomX_ConfigurationBase *xmrig::RxAlgo::base(Algorithm::Id algorithm)
     case Algorithm::RX_YADA:
         return &RandomX_YadaConfig;
 
+    case Algorithm::RX_TARI:
+        // Tari uses base RandomX configuration (no special tweaks)
+        return &RandomX_MoneroConfig;
+
     default:
         break;
     }

@@ -169,6 +169,11 @@ size_t xmrig::Job::nonceOffset() const
         return 147;
     }
 
+    // Tari uses 8-byte nonces at offset 35
+    if (algorithm() == Algorithm::RX_TARI) {
+        return 35;
+    }
+
     return 39;
 }
 

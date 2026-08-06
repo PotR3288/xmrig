@@ -29,6 +29,69 @@
 
 #include <array>
 #include <map>
+#include <vector>
+
+// Base58 decoder for Tari addresses
+// Simple multiply-accumulate: result = result * 58 + digit, using uint64_t chunks.
+static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &output)
+{
+    static constexpr const char *base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    output.clear();
+    if (len == 0) return true;
+
+    // Build reverse lookup table
+    int8_t rev[256];
+    memset(rev, -1, sizeof(rev));
+    for (size_t i = 0; base58_alphabet[i]; ++i) {
+        rev[static_cast<uint8_t>(base58_alphabet[i])] = static_cast<int8_t>(i);
+    }
+
+    // Count leading zeros (characters that map to value 0, i.e., '1')
+    size_t zero_count = 0;
+    while (zero_count < len && rev[static_cast<uint8_t>(input[zero_count])] == 0) {
+        ++zero_count;
+    }
+
+    // Multiply-accumulate: result *= 58, then add digit
+    // Store as array of uint64_t chunks (little-endian order within each chunk)
+    std::vector<uint64_t> chunks(1, 0);
+
+    for (size_t i = zero_count; i < len; ++i) {
+        const int8_t digit = rev[static_cast<uint8_t>(input[i])];
+        if (digit < 0) return false;
+
+        uint64_t carry = static_cast<uint64_t>(digit);
+        for (size_t j = 0; j < chunks.size(); ++j) {
+            __uint128_t val = static_cast<__uint128_t>(chunks[j]) * 58 + carry;
+            chunks[j] = static_cast<uint64_t>(val);
+            carry = static_cast<uint64_t>(val >> 64);
+        }
+        if (carry) {
+            chunks.push_back(carry);
+        }
+    }
+
+    // Convert to bytes: each chunk is little-endian, so extract MSB first
+    std::vector<uint8_t> raw;
+    for (int c = static_cast<int>(chunks.size()) - 1; c >= 0; --c) {
+        uint64_t num = chunks[c];
+        for (int b = 7; b >= 0; --b) {
+            raw.push_back(static_cast<uint8_t>((num >> (b * 8)) & 0xFF));
+        }
+    }
+
+    // Trim leading zeros, then restore zero_count
+    size_t first = 0;
+    while (first < raw.size() && raw[first] == 0) ++first;
+    for (size_t i = first; i < raw.size(); ++i) output.push_back(raw[i]);
+    if (zero_count > 0) {
+        const size_t insert_count = (zero_count <= output.size() + 7) ? zero_count : output.size() + 7;
+        output.insert(output.begin(), insert_count, 0);
+    }
+
+    return true;
+}
 
 
 bool xmrig::WalletAddress::decode(const char *address, size_t size)
@@ -50,6 +113,101 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
       }
       address += 4;
       size -= 4;
+    }
+
+    // Tari addresses start with specific 2-character prefixes:
+    // First char encodes network byte: '1'=0x00 (MainNet), 'f'=0x26 (Esmeralda)
+    // Second char encodes feature byte: '2'=0x01, etc.
+    static constexpr char base58_alphabet[] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    
+    bool is_tari_address = false;
+    uint8_t net_byte = 0, feat_byte = 0;
+
+    if (size >= 2 && address[0] == 'f') {
+        net_byte = 0x26; // Esmeralda
+        for (int i = 0; i < 58; ++i) {
+            if (base58_alphabet[i] == address[1]) { feat_byte = static_cast<uint8_t>(i); break; }
+        }
+        is_tari_address = true;
+    }
+    else if (size >= 2 && address[0] == '1') {
+        net_byte = 0x00; // MainNet
+        for (int i = 0; i < 58; ++i) {
+            if (base58_alphabet[i] == address[1]) { feat_byte = static_cast<uint8_t>(i); break; }
+        }
+        is_tari_address = true;
+    }
+
+    if (is_tari_address && size >= 2) {
+        m_tag = static_cast<uint64_t>(net_byte << 8 | feat_byte);
+        address += 2;
+        size -= 2;
+
+        // For Tari addresses, decode remaining characters using Base58
+        const char *rest_address = address;
+        size_t rest_size = size;
+
+        std::vector<uint8_t> rest_data;
+        if (!base58_decode(rest_address, rest_size, rest_data)) {
+            return false;
+        }
+
+        // Tari addresses: network(1) + features(1) + spend_key(32) + view_key(32) + checksum(1) = 67 bytes
+        const size_t expected_data_size = 67;  // network + features + spend + view + checksum
+
+        if (rest_data.size() != expected_data_size - 2) {
+            return false;
+        }
+
+        Buffer data;
+        data.reserve(expected_data_size);
+        data.emplace_back(net_byte);
+        data.emplace_back(feat_byte);
+
+        for (auto b : rest_data) {
+            data.emplace_back(b);
+        }
+
+        // Validate checksum using DammSum algorithm
+        const size_t data_size = data.size();
+        if (data_size != expected_data_size) {
+            return false;
+        }
+
+        uint8_t checksum = data.back();
+        const uint8_t *spend_key = data.data() + 34;   // offset 34: after network(1), features(1), and view_key(32)
+        const uint8_t *view_key = data.data() + 2;     // offset 2: after network and features
+
+        // Verify checksum using DammSum algorithm
+        uint8_t computed_checksum = 0;
+        for (size_t i = 0; i < data_size - 1; ++i) {
+            computed_checksum ^= data[i];
+            bool overflow = (computed_checksum & 0x80) != 0;
+            computed_checksum = static_cast<uint8_t>((computed_checksum << 1) & 0xFF);
+            if (overflow) {
+                computed_checksum ^= 0x1B;  // Damm mask
+            }
+        }
+
+        if (checksum != computed_checksum) {
+            return false;
+        }
+
+        // Map Tari network byte to XMRig Net type for tag construction
+        // MainNet (0x00) → MAINNET, Esmeralda/TestNet (0x26/0x10) → TESTNET, StageNet (0x01) → STAGENET
+        uint8_t tari_net_type = 0;
+        if (net_byte == 0x00) tari_net_type = 0;       // MAINNET
+        else if (net_byte == 0x26 || net_byte == 0x10) tari_net_type = 1;  // TESTNET/Esmeralda
+        else if (net_byte == 0x01) tari_net_type = 2;  // STAGENET
+
+        m_tag = static_cast<uint64_t>(tari_net_type) | (static_cast<uint64_t>(feat_byte) << 8);
+        memcpy(m_publicViewKey, view_key, 32);
+        memcpy(m_publicSpendKey, spend_key, 32);
+        memset(m_checksum, 0, sizeof(m_checksum));
+        m_checksum[0] = checksum;
+        m_data = String(address, size);
+
+        return true;
     }
 
     static constexpr std::array<int, 9> block_sizes{ 0, 2, 3, 5, 6, 7, 9, 10, 11 };
@@ -260,6 +418,19 @@ const xmrig::WalletAddress::TagInfo &xmrig::WalletAddress::tagInfo(uint64_t tag)
 
         { 0x424220,     { Coin::TOWNFORGE,     STAGENET,   PUBLIC,         38881,  38882 } },
         { 0x424221,     { Coin::TOWNFORGE,     STAGENET,   SUBADDRESS,     38881,  38882 } },
+
+        // Tari network tags (tari_net_type | (feat_byte << 8))
+        { 0x0100,     { Coin::TARI,       MAINNET,    PUBLIC,         9000,   9001 } },
+        { 0x0101,     { Coin::TARI,       MAINNET,    INTEGRATED,     9000,   9001 } },
+        { 0x0102,     { Coin::TARI,       MAINNET,    SUBADDRESS,     9000,   9001 } },
+
+        { 0x0103,     { Coin::TARI,       TESTNET,    PUBLIC,         9000,   9001 } },
+        { 0x0104,     { Coin::TARI,       TESTNET,    INTEGRATED,     9000,   9001 } },
+        { 0x0105,     { Coin::TARI,       TESTNET,    SUBADDRESS,     9000,   9001 } },
+
+        { 0x0201,     { Coin::TARI,       STAGENET,   PUBLIC,         9000,   9001 } },
+        { 0x0202,     { Coin::TARI,       STAGENET,    INTEGRATED,     9000,   9001 } },
+        { 0x0203,     { Coin::TARI,       STAGENET,   SUBADDRESS,     9000,   9001 } },
 
     };
 
