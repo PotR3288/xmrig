@@ -26,6 +26,13 @@
 #include "base/tools/cryptonote/umul128.h"
 #include "base/tools/Cvt.h"
 
+#if defined(_MSC_VER)
+static inline bool __builtin_add_overflow(uint64_t a, uint64_t b, uint64_t *out) {
+    *out = a + b;
+    return *out < a;
+}
+#endif
+
 
 #include <array>
 #include <map>
