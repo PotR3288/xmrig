@@ -234,12 +234,8 @@ void xmrig::DaemonClient::setPool(const Pool &pool)
 {
     BaseClient::setPool(pool);
 
-    fprintf(stderr, "[DaemonClient] setPool: user=%s, pool.coin()=%d\n", m_user.data(), static_cast<int>(pool.coin().id()));
     m_walletAddress.decode(m_user);
-    fprintf(stderr, "[DaemonClient] After decode: wallet coin=%d (isValid=%d)\n", static_cast<int>(m_walletAddress.coin().id()), m_walletAddress.coin().isValid());
-
     m_coin = pool.coin().isValid() ?  pool.coin() : m_walletAddress.coin();
-    fprintf(stderr, "[DaemonClient] Final coin=%d\n", static_cast<int>(m_coin.id()));
 
     if (!m_coin.isValid() && pool.algorithm() == Algorithm::RX_WOW) {
         m_coin = Coin::WOWNERO;
@@ -399,8 +395,6 @@ bool xmrig::DaemonClient::parseJob(const rapidjson::Value &params, int *code)
         return jobError("Empty block template received from daemon."); // FIXME
     }
 
-    fprintf(stderr, "[DaemonClient] blocktemplate_blob len=%zu first80=[%.*s]\n", blocktemplate.size(), 80, blocktemplate.data());
-    fprintf(stderr, "[DaemonClient] BlockTemplate parsing with coin: %d\n", static_cast<int>(m_coin.id()));
     if (!m_blocktemplate.parse(blocktemplate, m_coin)) {
         return jobError("Invalid block template received from daemon.");
     }
