@@ -65,21 +65,15 @@ public:
     inline size_t size() const                              { return m_blob.size(); }
 
     // Tari-specific constants
-    static constexpr size_t TARI_NONCE_OFFSET = 35;        // Tari uses 8-byte nonces at offset 35
-    static constexpr size_t TARI_MINER_TX_PREFIX_OFFSET = 43;  // After nonce (35 + 8)
+    static constexpr size_t TARI_NONCE_OFFSET     = 35;   // Tari uses 8-byte nonces at offset 35
+    static constexpr size_t TARI_MINER_TX_PREFIX_OFFSET = TARI_NONCE_OFFSET + 8;  // Immediately after nonce
 
     // Block header
     inline uint8_t majorVersion() const                     { return m_version.first; }
     inline uint8_t minorVersion() const                     { return m_version.second; }
     inline uint64_t timestamp() const                       { return m_timestamp; }
     inline const Span &prevId() const                       { return m_prevId; }
-    inline const uint8_t *nonce() const {
-        // For Tari, use the stored nonce from offset 35
-        if (m_coin.id() == Coin::TARI) {
-            return m_nonceTemp;
-        }
-        return blob(NONCE_OFFSET);
-    }
+    inline const uint8_t *nonce() const                     { return blob(NONCE_OFFSET); }
 
     // Wownero miner signature
     inline bool hasMinerSignature() const                   { return !m_minerSignature.empty(); }
@@ -164,8 +158,6 @@ private:
     uint8_t m_janusAnchor[16]{};
     uint8_t m_FCMPTreeLayers = 0;
 
-    // Tari-specific: nonce storage (8 bytes at offset 35)
-    alignas(8) uint8_t m_nonceTemp[8]{};
     uint8_t m_FCMPTreeRoot[kHashSize]{};
 };
 

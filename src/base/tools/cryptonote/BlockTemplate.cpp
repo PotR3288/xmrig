@@ -173,9 +173,7 @@ bool xmrig::BlockTemplate::parse(const char *blocktemplate, size_t size, const C
 
     try {
         rc = parse(hashes);
-    } catch (...) {
-        rc = false;
-    }
+    } catch (...) {}
 
     return rc;
 }
@@ -219,10 +217,8 @@ bool xmrig::BlockTemplate::parse(bool hashes)
     ar(m_timestamp);
     ar(m_prevId, kHashSize);
 
-    // Tari: 8-byte nonce at offset 35, no standard miner-tx parsing needed
-    if (m_coin.id() == Coin::TARI) {
-        setOffset(NONCE_OFFSET, TARI_NONCE_OFFSET);
-        memcpy(m_nonceTemp, m_blob.data() + TARI_NONCE_OFFSET, 8);
+    // Tari: no standard miner-tx parsing needed
+    if (m_coin == Coin::TARI) {
         setOffset(MINER_TX_PREFIX_OFFSET, TARI_MINER_TX_PREFIX_OFFSET);
         setOffset(MINER_TX_PREFIX_END_OFFSET, m_blob.size());
         return true;
@@ -238,7 +234,7 @@ bool xmrig::BlockTemplate::parse(bool hashes)
         uint8_t pricing_record[120];
         ar(pricing_record);
     }
-    
+
     // Miner transaction begin
     // Prefix begin
     setOffset(MINER_TX_PREFIX_OFFSET, ar.index());

@@ -239,6 +239,7 @@ xmrig::IClient *xmrig::Pool::createClient(int id, IClientListener *listener) con
     }
 #   ifdef XMRIG_FEATURE_HTTP
     else if (m_mode == MODE_DAEMON) {
+        fprintf(stderr, "[Pool] Creating DaemonClient for algo=%s, coin=%d\n", m_algorithm.name(), static_cast<int>(m_coin.id()));
         client = new DaemonClient(id, listener);
     }
     else if (m_mode == MODE_SELF_SELECT) {

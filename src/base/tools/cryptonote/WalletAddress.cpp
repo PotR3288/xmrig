@@ -74,9 +74,13 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
 
         uint64_t carry = static_cast<uint64_t>(digit);
         for (size_t j = 0; j < chunks.size(); ++j) {
-            __uint128_t val = static_cast<__uint128_t>(chunks[j]) * 58 + carry;
-            chunks[j] = static_cast<uint64_t>(val);
-            carry = static_cast<uint64_t>(val >> 64);
+            uint64_t hi;
+            const uint64_t lo = __umul128(chunks[j], 58, &hi);
+            if (__builtin_add_overflow(lo, carry, &chunks[j])) {
+                carry = hi + 1;
+            } else {
+                carry = hi;
+            }
         }
         if (carry) {
             chunks.push_back(carry);
@@ -359,6 +363,10 @@ rapidjson::Value xmrig::WalletAddress::toAPI(rapidjson::Document &doc) const
 const xmrig::WalletAddress::TagInfo &xmrig::WalletAddress::tagInfo(uint64_t tag)
 {
     static TagInfo dummy = { Coin::INVALID, MAINNET, PUBLIC, 0, 0 };
+    
+    // Debug: print the tag being looked up
+    fprintf(stderr, "[WalletAddress] Looking up tag: 0x%llx\n", (unsigned long long)tag);
+    
     static const std::map<uint64_t, TagInfo> tags = {
         { 0x12,     { Coin::MONERO,     MAINNET,    PUBLIC,         18081,  18082 } },
         { 0x13,     { Coin::MONERO,     MAINNET,    INTEGRATED,     18081,  18082 } },
