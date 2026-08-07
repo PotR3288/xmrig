@@ -82,11 +82,9 @@ int xmrig::Pools::donateLevel() const
 
 xmrig::IStrategy *xmrig::Pools::createStrategy(IStrategyListener *listener) const
 {
-    fprintf(stderr, "[Pools] Creating strategy for %d enabled pools\n", static_cast<int>(active()));
     if (active() == 1) {
         for (const Pool &pool : m_data) {
             if (pool.isEnabled()) {
-                fprintf(stderr, "[Pools] Using SinglePoolStrategy with coin=%d algo=%s user=%s\n", static_cast<int>(pool.coin().id()), pool.algorithm().name(), pool.user().data());
                 return new SinglePoolStrategy(pool, retryPause(), retries(), listener);
             }
         }
@@ -95,7 +93,6 @@ xmrig::IStrategy *xmrig::Pools::createStrategy(IStrategyListener *listener) cons
     auto strategy = new FailoverStrategy(retryPause(), retries(), listener);
     for (const Pool &pool : m_data) {
         if (pool.isEnabled()) {
-            fprintf(stderr, "[Pools] Adding pool coin=%d algo=%s user=%s\n", static_cast<int>(pool.coin().id()), pool.algorithm().name(), pool.user().data());
             strategy->add(pool);
         }
     }
