@@ -224,6 +224,12 @@ bool xmrig::BlockTemplate::parse(bool hashes)
         return true;
     }
 
+    // Non-Tari coins: skip 4-byte nonce in miner tx prefix
+    {
+        setOffset(NONCE_OFFSET, ar.index());
+        ar.skip(kNonceSize);
+    }
+
     // Wownero block template has miner signature starting from version 18
     if (m_coin == Coin::WOWNERO && majorVersion() >= 18) {
         ar(m_minerSignature, kSignatureSize);

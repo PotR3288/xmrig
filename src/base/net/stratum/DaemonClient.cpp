@@ -399,6 +399,7 @@ bool xmrig::DaemonClient::parseJob(const rapidjson::Value &params, int *code)
         return jobError("Empty block template received from daemon."); // FIXME
     }
 
+    fprintf(stderr, "[DaemonClient] blocktemplate_blob len=%zu first80=[%.*s]\n", blocktemplate.size(), 80, blocktemplate.data());
     fprintf(stderr, "[DaemonClient] BlockTemplate parsing with coin: %d\n", static_cast<int>(m_coin.id()));
     if (!m_blocktemplate.parse(blocktemplate, m_coin)) {
         return jobError("Invalid block template received from daemon.");
