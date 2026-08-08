@@ -83,6 +83,7 @@ public:
     inline uint64_t diff() const                        { return m_diff; }
     inline uint64_t height() const                      { return m_height; }
     inline uint64_t nonceMask() const                   { return isNicehash() ? 0xFFFFFFULL : (nonceSize() == sizeof(uint64_t) ? (static_cast<uint64_t>(-1LL) >> (extraNonce().size() * 4)) : 0xFFFFFFFFULL); }
+    inline uint64_t startNonce() const                  { return m_startNonce; }
     inline uint64_t target() const                      { return m_target; }
     inline uint8_t *blob()                              { return m_blob; }
     inline uint8_t fixedByte() const                    { return *(m_blob + 42); }
@@ -95,6 +96,7 @@ public:
     inline void setExtraNonce(const String &extraNonce) { m_extraNonce = extraNonce; }
     inline void setHeight(uint64_t height)              { m_height = height; }
     inline void setIndex(uint8_t index)                 { m_index = index; }
+    inline void setStartNonce(uint64_t startNonce)      { m_startNonce = startNonce; }
     inline void setPoolWallet(const String &poolWallet) { m_poolWallet = poolWallet; }
 
 #   ifdef XMRIG_PROXY_PROJECT
@@ -156,9 +158,10 @@ private:
     String m_id;
     String m_poolWallet;
     uint32_t m_backend  = 0;
-    uint64_t m_diff     = 0;
-    uint64_t m_height   = 0;
-    uint64_t m_target   = 0;
+    uint64_t m_diff       = 0;
+    uint64_t m_height     = 0;
+    uint64_t m_startNonce = 0;
+    uint64_t m_target     = 0;
     uint8_t m_blob[kMaxBlobSize]{ 0 };
     uint8_t m_index     = 0;
 

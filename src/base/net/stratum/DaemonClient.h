@@ -98,6 +98,7 @@ private:
 
     BlockTemplate m_blocktemplate;
     Coin m_coin;
+    uint64_t m_extraNonce = 0;
     std::shared_ptr<IHttpListener> m_httpListener;
     String m_blockhashingblob;
     String m_blocktemplateRequestHash;

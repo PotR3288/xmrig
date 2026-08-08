@@ -483,6 +483,10 @@ bool xmrig::DaemonClient::parseJob(const rapidjson::Value &params, int *code)
     job.setHeight(Json::getUint64(params, kHeight));
     job.setDiff(Json::getUint64(params, "difficulty"));
 
+    if (m_coin == Coin::TARI) {
+        job.setStartNonce(m_extraNonce);
+    }
+
     m_currentJobId = Cvt::toHex(Cvt::randomBytes(4));
     job.setId(m_currentJobId);
 
@@ -552,9 +556,13 @@ int64_t xmrig::DaemonClient::getBlockTemplate()
     Document doc(kObjectType);
     auto &allocator = doc.GetAllocator();
 
+    uint8_t extra_nonce_bytes[kBlobReserveSize];
+    Cvt::randomBytes(extra_nonce_bytes, kBlobReserveSize);
+    m_extraNonce = *reinterpret_cast<uint64_t*>(extra_nonce_bytes);
+
     Value params(kObjectType);
     params.AddMember("wallet_address", m_user.toJSON(), allocator);
-    params.AddMember("extra_nonce", Cvt::toHex(Cvt::randomBytes(kBlobReserveSize)).toJSON(doc), allocator);
+    params.AddMember("extra_nonce", Cvt::toHex(extra_nonce_bytes, kBlobReserveSize).toJSON(doc), allocator);
 
     JsonRequest::create(doc, m_sequence, "getblocktemplate", params);
 
