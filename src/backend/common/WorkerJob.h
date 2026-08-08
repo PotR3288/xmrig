@@ -102,6 +102,11 @@ private:
 
         m_jobs[index()].setBackend(backend);
 
+        // For TARI, set the global nonce counter to startNonce so nonces begin from this offset
+        if (job.startNonce() != 0) {
+            Nonce::setNonce(index(), job.startNonce());
+        }
+
         for (size_t i = 0; i < N; ++i) {
             memcpy(m_blobs[index()] + (i * size), job.blob(), size);
             Nonce::next(index(), nonce(i), reserveCount, nonceMask());

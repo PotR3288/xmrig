@@ -42,6 +42,7 @@ public:
     static inline uint64_t sequence(Backend backend)                    { return m_sequence[backend].load(std::memory_order_relaxed); }
     static inline void pause(bool paused)                               { m_paused = paused; }
     static inline void reset(uint8_t index)                             { m_nonces[index] = 0; }
+    static inline void setNonce(uint8_t index, uint64_t value)          { m_nonces[index] = value; }
     static inline void stop(Backend backend)                            { m_sequence[backend] = 0; }
     static inline void touch(Backend backend)                           { m_sequence[backend]++; }
 

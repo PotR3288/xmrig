@@ -96,6 +96,8 @@ public:
     inline void setHeight(uint64_t height)              { m_height = height; }
     inline void setIndex(uint8_t index)                 { m_index = index; }
     inline void setPoolWallet(const String &poolWallet) { m_poolWallet = poolWallet; }
+    inline uint64_t startNonce() const                  { return m_startNonce; }
+    inline void setStartNonce(uint64_t startNonce)      { m_startNonce = startNonce; }
 
 #   ifdef XMRIG_PROXY_PROJECT
     inline char *rawBlob()                              { return m_rawBlob; }
@@ -156,9 +158,10 @@ private:
     String m_id;
     String m_poolWallet;
     uint32_t m_backend  = 0;
-    uint64_t m_diff     = 0;
-    uint64_t m_height   = 0;
-    uint64_t m_target   = 0;
+    uint64_t m_diff       = 0;
+    uint64_t m_height     = 0;
+    uint64_t m_startNonce = 0;
+    uint64_t m_target     = 0;
     uint8_t m_blob[kMaxBlobSize]{ 0 };
     uint8_t m_index     = 0;
 
