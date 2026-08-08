@@ -105,10 +105,6 @@ private:
         for (size_t i = 0; i < N; ++i) {
             memcpy(m_blobs[index()] + (i * size), job.blob(), size);
             Nonce::next(index(), nonce(i), reserveCount, nonceMask());
-            if (job.startNonce() != 0) {
-                uint64_t* n = reinterpret_cast<uint64_t*>(m_blobs[index()] + (i * size) + nonceOffset());
-                writeUnaligned(n, readUnaligned(n) + job.startNonce());
-            }
         }
     }
 
@@ -164,10 +160,6 @@ inline void xmrig::WorkerJob<1>::save(const Job &job, uint32_t reserveCount, Non
 
     memcpy(blob(), job.blob(), job.size());
     Nonce::next(index(), nonce(), reserveCount, nonceMask());
-    if (job.startNonce() != 0) {
-        uint64_t* n = reinterpret_cast<uint64_t*>(blob() + nonceOffset());
-        writeUnaligned(n, readUnaligned(n) + job.startNonce());
-    }
 }
 
 
