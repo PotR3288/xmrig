@@ -103,14 +103,12 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
         }
     }
 
-    // Trim leading zeros, then restore zero_count
+    // Trim leading zeros, then restore the exact number of leading zero bytes
+    // encoded by the leading '1' characters (one zero byte per '1').
     size_t first = 0;
     while (first < raw.size() && raw[first] == 0) ++first;
     for (size_t i = first; i < raw.size(); ++i) output.push_back(raw[i]);
-    if (zero_count > 0) {
-        const size_t insert_count = (zero_count <= output.size() + 7) ? zero_count : output.size() + 7;
-        output.insert(output.begin(), insert_count, 0);
-    }
+    output.insert(output.begin(), zero_count, 0);
 
     return true;
 }
@@ -151,10 +149,14 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
     }
 
     if (is_tari_prefix) {
-        uint8_t feat_byte = static_cast<uint8_t>(base58_reverse()[static_cast<uint8_t>(address[1])]);
+        const int8_t feat_index = base58_reverse()[static_cast<uint8_t>(address[1])];
         // Cleared up front: m_tag persists across decode() calls, so a failed Tari decode
-        // must not leak either the early draft value or a previously decoded address's tag.
+        // must not leak a previously decoded address's tag.
         m_tag = 0;
+        if (feat_index < 0) {
+            return false;
+        }
+        const uint8_t feat_byte = static_cast<uint8_t>(feat_index);
         address += 2;
         size -= 2;
 
@@ -188,14 +190,14 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
         const uint8_t *spend_key = data.data() + 34;   // offset 34: after network(1), features(1), and view_key(32)
         const uint8_t *view_key = data.data() + 2;     // offset 2: after network and features
 
-        // Verify checksum using DammSum algorithm
+        // Verify checksum: CRC-style fold (feedback polynomial x^8 + x^4 + x^3 + x^2 + 1)
         uint8_t computed_checksum = 0;
         for (size_t i = 0; i < data_size - 1; ++i) {
             computed_checksum ^= data[i];
             bool overflow = (computed_checksum & 0x80) != 0;
             computed_checksum = static_cast<uint8_t>((computed_checksum << 1) & 0xFF);
             if (overflow) {
-                computed_checksum ^= 0x1B;  // Damm mask
+                computed_checksum ^= 0x1B;
             }
         }
 

@@ -41,6 +41,7 @@
 #include "base/net/http/HttpListener.h"
 #include "base/net/stratum/SubmitResult.h"
 #include "base/net/tools/NetBuffer.h"
+#include "base/tools/Alignment.h"
 #include "base/tools/bswap_64.h"
 #include "base/tools/cryptonote/Signatures.h"
 #include "base/tools/Cvt.h"
@@ -558,7 +559,7 @@ int64_t xmrig::DaemonClient::getBlockTemplate()
 
     uint8_t extra_nonce_bytes[kBlobReserveSize];
     Cvt::randomBytes(extra_nonce_bytes, kBlobReserveSize);
-    m_extraNonce = *reinterpret_cast<uint64_t*>(extra_nonce_bytes);
+    m_extraNonce = readUnaligned(reinterpret_cast<const uint64_t*>(extra_nonce_bytes));
 
     Value params(kObjectType);
     params.AddMember("wallet_address", m_user.toJSON(), allocator);
