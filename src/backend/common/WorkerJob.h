@@ -102,9 +102,10 @@ private:
 
         m_jobs[index()].setBackend(backend);
 
-        // For TARI, set the global nonce counter to startNonce so nonces begin from this offset
+        // For TARI, set the global nonce counter to startNonce so nonces begin from this offset.
+        // The seed is reduced through the mask: Nonce::next() refuses counters above the mask.
         if (job.startNonce() != 0) {
-            Nonce::setNonce(index(), job.startNonce());
+            Nonce::setNonce(index(), job.startNonce() & job.nonceMask());
         }
 
         for (size_t i = 0; i < N; ++i) {
@@ -162,6 +163,12 @@ inline void xmrig::WorkerJob<1>::save(const Job &job, uint32_t reserveCount, Non
     m_nonce_mask[index()] = job.nonceMask();
 
     m_jobs[index()].setBackend(backend);
+
+    // For TARI, set the global nonce counter to startNonce so nonces begin from this offset.
+    // The seed is reduced through the mask: Nonce::next() refuses counters above the mask.
+    if (job.startNonce() != 0) {
+        Nonce::setNonce(index(), job.startNonce() & job.nonceMask());
+    }
 
     memcpy(blob(), job.blob(), job.size());
     Nonce::next(index(), nonce(), reserveCount, nonceMask());
