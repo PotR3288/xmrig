@@ -484,14 +484,6 @@ bool xmrig::DaemonClient::parseJob(const rapidjson::Value &params, int *code)
     job.setDiff(Json::getUint64(params, "difficulty"));
 
     if (m_coin == Coin::TARI) {
-        // One-shot diagnostic: shows whether the daemon embeds extra_nonce into the hashing blob's nonce
-        // field (nonzero) or zeroes it, which decides which nonce-separation regime is active.
-        static bool tariBlobProbed = false;
-        if (!tariBlobProbed) {
-            tariBlobProbed = true;
-            LOG_INFO("TARI probe: blockhashing_blob[35..42] = %s", Cvt::toHex(job.blob() + job.nonceOffset(), 8).data());
-        }
-
         job.setStartNonce(m_extraNonce);
     }
 

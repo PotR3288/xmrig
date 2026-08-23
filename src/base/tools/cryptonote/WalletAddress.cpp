@@ -140,16 +140,21 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
     // Tari addresses start with specific 2-character prefixes:
     // First char encodes network byte: '1'=0x00 (MainNet), 'f'=0x26 (Esmeralda)
     // Second char encodes feature byte, looked up via the shared Base58 reverse table.
+    bool is_tari_prefix = false;
     uint8_t net_byte = 0;
     if (size >= 2 && address[0] == 'f') {
+        is_tari_prefix = true;
         net_byte = 0x26; // Esmeralda
     } else if (size >= 2 && address[0] == '1') {
+        is_tari_prefix = true;
         net_byte = 0x00; // MainNet
     }
 
-    if (net_byte != 0 || address[0] == '1') {
+    if (is_tari_prefix) {
         uint8_t feat_byte = static_cast<uint8_t>(base58_reverse()[static_cast<uint8_t>(address[1])]);
-        m_tag = static_cast<uint64_t>(net_byte << 8 | feat_byte);
+        // Cleared up front: m_tag persists across decode() calls, so a failed Tari decode
+        // must not leak either the early draft value or a previously decoded address's tag.
+        m_tag = 0;
         address += 2;
         size -= 2;
 
@@ -425,18 +430,20 @@ const xmrig::WalletAddress::TagInfo &xmrig::WalletAddress::tagInfo(uint64_t tag)
         { 0x424220,     { Coin::TOWNFORGE,     STAGENET,   PUBLIC,         38881,  38882 } },
         { 0x424221,     { Coin::TOWNFORGE,     STAGENET,   SUBADDRESS,     38881,  38882 } },
 
-        // Tari network tags (tari_net_type | (feat_byte << 8))
+        // Tari network tags: tag = tari_net_type | (feat_byte << 8), built at the end of decode().
+        // feat_byte: PUBLIC=1 ('2' prefix), INTEGRATED=2 ('3'), SUBADDRESS=3 ('4')
         { 0x0100,     { Coin::TARI,       MAINNET,    PUBLIC,         9000,   9001 } },
-        { 0x0101,     { Coin::TARI,       MAINNET,    INTEGRATED,     9000,   9001 } },
-        { 0x0102,     { Coin::TARI,       MAINNET,    SUBADDRESS,     9000,   9001 } },
+        { 0x0200,     { Coin::TARI,       MAINNET,    INTEGRATED,     9000,   9001 } },
+        { 0x0300,     { Coin::TARI,       MAINNET,    SUBADDRESS,     9000,   9001 } },
 
-        { 0x0103,     { Coin::TARI,       TESTNET,    PUBLIC,         9000,   9001 } },
-        { 0x0104,     { Coin::TARI,       TESTNET,    INTEGRATED,     9000,   9001 } },
-        { 0x0105,     { Coin::TARI,       TESTNET,    SUBADDRESS,     9000,   9001 } },
+        { 0x0101,     { Coin::TARI,       TESTNET,    PUBLIC,         9000,   9001 } },
+        { 0x0201,     { Coin::TARI,       TESTNET,    INTEGRATED,     9000,   9001 } },
+        { 0x0301,     { Coin::TARI,       TESTNET,    SUBADDRESS,     9000,   9001 } },
 
-        { 0x0201,     { Coin::TARI,       STAGENET,   PUBLIC,         9000,   9001 } },
-        { 0x0202,     { Coin::TARI,       STAGENET,    INTEGRATED,     9000,   9001 } },
-        { 0x0203,     { Coin::TARI,       STAGENET,   SUBADDRESS,     9000,   9001 } },
+        // Stagenet tags are unreachable until decode() learns a '2' first-char prefix (net_byte 0x01)
+        { 0x0102,     { Coin::TARI,       STAGENET,   PUBLIC,         9000,   9001 } },
+        { 0x0202,     { Coin::TARI,       STAGENET,   INTEGRATED,     9000,   9001 } },
+        { 0x0302,     { Coin::TARI,       STAGENET,   SUBADDRESS,     9000,   9001 } },
 
     };
 
