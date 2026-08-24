@@ -560,6 +560,11 @@ int64_t xmrig::DaemonClient::getBlockTemplate()
     uint8_t extra_nonce_bytes[kBlobReserveSize];
     Cvt::randomBytes(extra_nonce_bytes, kBlobReserveSize);
     m_extraNonce = readUnaligned(reinterpret_cast<const uint64_t*>(extra_nonce_bytes));
+    // R1-9 verification: each instance mints its own random extra_nonce here; the low 32 bits
+    // become the nonce-counter seed (startNonce & nonceMask), so distinct low32 values mean
+    // disjoint scan ranges. Run with -v to see it.
+    LOG_V1("%s extra_nonce=0x%016" PRIx64 "  seed(low32)=0x%08" PRIx64,
+           tag(), m_extraNonce, m_extraNonce & 0xFFFFFFFFULL);
 
     Value params(kObjectType);
     params.AddMember("wallet_address", m_user.toJSON(), allocator);

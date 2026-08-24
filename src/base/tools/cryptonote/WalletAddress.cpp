@@ -27,10 +27,13 @@
 #include "base/tools/Cvt.h"
 
 #if defined(_MSC_VER)
-static inline bool __builtin_add_overflow(uint64_t a, uint64_t b, uint64_t *out) {
+static inline bool xmrig_u64_add_overflow(uint64_t a, uint64_t b, uint64_t *out) {
     *out = a + b;
     return *out < a;
 }
+#define xmrig_add_overflow(a, b, out) xmrig_u64_add_overflow(a, b, out)
+#else
+#define xmrig_add_overflow(a, b, out) __builtin_add_overflow(a, b, out)
 #endif
 
 
@@ -83,7 +86,7 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
         for (size_t j = 0; j < chunks.size(); ++j) {
             uint64_t hi;
             const uint64_t lo = __umul128(chunks[j], 58, &hi);
-            if (__builtin_add_overflow(lo, carry, &chunks[j])) {
+            if (xmrig_add_overflow(lo, carry, &chunks[j])) {
                 carry = hi + 1;
             } else {
                 carry = hi;
