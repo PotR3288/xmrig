@@ -123,15 +123,20 @@ public:
 
         if (reset) {
             Nonce::reset(job.index());
-        }
 
-        // For TARI, seed the global nonce counter to startNonce once per job so nonces
-        // begin from this offset. This must happen here on the single-threaded control
-        // path: seeding from WorkerJob::save() lets every worker thread re-store the same
-        // startNonce, rewinding counters that other threads have already advanced past.
-        // The seed is reduced through the mask: Nonce::next() refuses counters above the mask.
-        if (job.startNonce() != 0) {
-            Nonce::setNonce(job.index(), job.startNonce() & job.nonceMask());
+            // For TARI, seed the global nonce counter to startNonce, but only when the
+            // blob actually changed (a new block). This must happen here on the
+            // single-threaded control path: seeding from WorkerJob::save() lets every
+            // worker thread re-store the same startNonce, rewinding counters that other
+            // threads have already advanced past. The seed is reduced through the mask:
+            // Nonce::next() refuses counters above the mask.
+            //
+            // Gating on `reset` (false when the daemon re-sent the same blob, e.g. on
+            // every daemon-job-timeout poll) lets the counter keep grinding the current
+            // block instead of jumping to a fresh random offset each time.
+            if (job.startNonce() != 0) {
+                Nonce::setNonce(job.index(), job.startNonce() & job.nonceMask());
+            }
         }
 
         for (IBackend *backend : backends) {

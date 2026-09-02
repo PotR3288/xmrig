@@ -59,9 +59,9 @@ public:
     inline bool decode(const String &address)               { return decode(address, address.size()); }
     inline bool isValid() const {
         if (m_tag == 0) return false;
-        // Tari addresses use a different encoding that results in shorter Base58 strings
-        size_t min_size = (coin() == Coin::TARI) ? 45 : kMinSize;
-        return m_data.size() >= min_size;
+        // Tari payload length is strictly enforced in decode() (exact decoded size),
+        // so no separate string-length floor is needed here.
+        return (coin() == Coin::TARI) || (m_data.size() >= kMinSize);
     }
     inline const char *data() const                         { return m_data; }
     inline const Coin &coin() const                         { return tagInfo(m_tag).coin; }

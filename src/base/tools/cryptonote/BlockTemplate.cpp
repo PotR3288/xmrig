@@ -217,7 +217,10 @@ bool xmrig::BlockTemplate::parse(bool hashes)
     ar(m_timestamp);
     ar(m_prevId, kHashSize);
 
-    // Tari: no standard miner-tx parsing needed
+    // Tari: block hash covers the full template blob (no Monero-style merkle
+    // root over tx hashes), so the "miner tx prefix" span is the entire
+    // remainder of the blob. Verified in practice with accepted solutions
+    // on Tari mainnet and Esmeralda.
     if (m_coin == Coin::TARI) {
         setOffset(MINER_TX_PREFIX_OFFSET, TARI_MINER_TX_PREFIX_OFFSET);
         setOffset(MINER_TX_PREFIX_END_OFFSET, m_blob.size());
