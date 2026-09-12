@@ -41,10 +41,8 @@ static inline bool xmrig_u64_add_overflow(uint64_t a, uint64_t b, uint64_t *out)
 #include <map>
 #include <vector>
 
-// Base58 alphabet for Tari address decoding
 static constexpr const char *base58_alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-// Reverse lookup table for Base58 (initialized once, thread-safe under C++11+).
 static const int8_t *base58_reverse()
 {
     static const int8_t *rev = [] {
@@ -58,8 +56,7 @@ static const int8_t *base58_reverse()
     return rev;
 }
 
-// Base58 decoder for Tari addresses
-// Simple multiply-accumulate: result = result * 58 + digit, using uint64_t chunks.
+// Base58 decoder: result = result * 58 + digit, one uint64_t chunk at a time.
 static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &output)
 {
 
@@ -68,14 +65,11 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
 
     const int8_t *rev = base58_reverse();
 
-    // Count leading zeros (characters that map to value 0, i.e., '1')
     size_t zero_count = 0;
     while (zero_count < len && rev[static_cast<uint8_t>(input[zero_count])] == 0) {
         ++zero_count;
     }
 
-    // Multiply-accumulate: result *= 58, then add digit
-    // Store as array of uint64_t chunks (little-endian order within each chunk)
     std::vector<uint64_t> chunks(1, 0);
 
     for (size_t i = zero_count; i < len; ++i) {
@@ -97,7 +91,6 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
         }
     }
 
-    // Convert to bytes: each chunk is little-endian, so extract MSB first
     std::vector<uint8_t> raw;
     for (int c = static_cast<int>(chunks.size()) - 1; c >= 0; --c) {
         uint64_t num = chunks[c];
@@ -106,8 +99,7 @@ static bool base58_decode(const char *input, size_t len, std::vector<uint8_t> &o
         }
     }
 
-    // Trim leading zeros, then restore the exact number of leading zero bytes
-    // encoded by the leading '1' characters (one zero byte per '1').
+    // Trim leading zeros, then restore one zero byte per leading '1'
     size_t first = 0;
     while (first < raw.size() && raw[first] == 0) ++first;
     for (size_t i = first; i < raw.size(); ++i) output.push_back(raw[i]);
@@ -138,9 +130,8 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
       size -= 4;
     }
 
-    // Tari addresses start with specific 2-character prefixes:
-    // First char encodes network byte: '1'=0x00 (MainNet), 'f'=0x26 (Esmeralda)
-    // Second char encodes feature byte, looked up via the shared Base58 reverse table.
+    // First address char selects the network ('1'=MainNet 0x00, 'f'=Esmeralda 0x26),
+    // second char is the base58 index of the feature byte.
     bool is_tari_prefix = false;
     uint8_t net_byte = 0;
     if (size >= 2 && address[0] == 'f') {
@@ -153,9 +144,7 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
 
     if (is_tari_prefix) {
         const int8_t feat_index = base58_reverse()[static_cast<uint8_t>(address[1])];
-        // Cleared up front: m_tag persists across decode() calls, so a failed Tari decode
-        // must not leak a previously decoded address's tag.
-        m_tag = 0;
+        m_tag = 0; // persists across decode() calls; clear before any failure path
         if (feat_index < 0) {
             return false;
         }
@@ -163,7 +152,6 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
         address += 2;
         size -= 2;
 
-        // For Tari addresses, decode remaining characters using Base58
         const char *rest_address = address;
         size_t rest_size = size;
 
@@ -172,8 +160,8 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
             return false;
         }
 
-        // Tari addresses: network(1) + features(1) + view_key(32) + spend_key(32) + checksum(1) = 67 bytes
-        const size_t expected_data_size = 67;  // network + features + view + spend + checksum
+        // network(1) + features(1) + view_key(32) + spend_key(32) + checksum(1)
+        const size_t expected_data_size = 67;
 
         if (rest_data.size() != expected_data_size - 2) {
             return false;
@@ -193,10 +181,7 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
         const uint8_t *spend_key = data.data() + 34;   // offset 34: after network(1), features(1), and view_key(32)
         const uint8_t *view_key = data.data() + 2;     // offset 2: after network and features
 
-        // Verify checksum: CRC-style fold (feedback polynomial x^8 + x^4 + x^3 + x^2 + 1).
-        // Verified against live Tari addresses: Mainnet and Esmeralda (testnet) addresses
-        // both decode here and have produced accepted block solutions through the full
-        // mine-and-submit path (payouts received on both networks).
+        // CRC-style fold, poly x^8 + x^4 + x^3 + x^2 + 1; matches Tari wallet addresses
         uint8_t computed_checksum = 0;
         for (size_t i = 0; i < data_size - 1; ++i) {
             computed_checksum ^= data[i];
@@ -211,9 +196,7 @@ bool xmrig::WalletAddress::decode(const char *address, size_t size)
             return false;
         }
 
-        // Map Tari network byte to XMRig Net type for tag construction.
-        // Only MainNet (0x00) and Esmeralda/testnet (0x26) are supported; stagenet is
-        // intentionally not handled -- xmrig will never target a Tari stagenet daemon.
+        // stagenet intentionally unsupported
         uint8_t tari_net_type = 0;
         if (net_byte == 0x00) tari_net_type = 0;       // MAINNET
         else if (net_byte == 0x26 || net_byte == 0x10) tari_net_type = 1;  // TESTNET/Esmeralda
@@ -439,8 +422,7 @@ const xmrig::WalletAddress::TagInfo &xmrig::WalletAddress::tagInfo(uint64_t tag)
         { 0x424220,     { Coin::TOWNFORGE,     STAGENET,   PUBLIC,         38881,  38882 } },
         { 0x424221,     { Coin::TOWNFORGE,     STAGENET,   SUBADDRESS,     38881,  38882 } },
 
-        // Tari network tags: tag = tari_net_type | (feat_byte << 8), built at the end of decode().
-        // feat_byte index is the second address character; PUBLIC=1, INTEGRATED=2, SUBADDRESS=3
+        // feat_byte is the second address character: PUBLIC=1, INTEGRATED=2, SUBADDRESS=3
         { 0x0100,     { Coin::TARI,       MAINNET,    PUBLIC,         9000,   9001 } },
         { 0x0200,     { Coin::TARI,       MAINNET,    INTEGRATED,     9000,   9001 } },
         { 0x0300,     { Coin::TARI,       MAINNET,    SUBADDRESS,     9000,   9001 } },
